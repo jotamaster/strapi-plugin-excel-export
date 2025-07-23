@@ -1,6 +1,6 @@
 {
   "name": "strapi-plugin-excel-export-2025-jotamaster",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "A strapi plugin used which can be used to download data in xlsx format",
   "strapi": {
     "name": "excel-export",
@@ -24,7 +24,7 @@
   },
   "peerDependencies": {
     "react": ">=17.0.2",
-    "react-dom": "^17.0.2",
+    "react-dom": ">=17.0.2",
     "react-router-dom": "^5.3.4",
     "styled-components": "^5.3.6",
     "@strapi/strapi": "^4.0.0"
