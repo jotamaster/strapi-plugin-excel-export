@@ -101,7 +101,72 @@ const HomePage = () => {
     name:
       property?.charAt(0).toUpperCase() + property?.slice(1).replace(/_/g, " "),
     selector: (row) => row[property],
+    style: {
+      minWidth: '150px',
+      maxWidth: '250px',
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+    },
   }));
+
+  const fetchAllDataForExport = async () => {
+    try {
+      const response = await axios.get(
+        `${baseUrl}/excel-export/get/table/data?uid=${selectedValue}&limit=10000&offset=0`
+      );
+      return response?.data?.data || [];
+    } catch (error) {
+      console.error("Error fetching all data for CSV export:", error);
+      return [];
+    }
+  };
+  
+
+
+  const handleDownloadCSV = async () => {
+    if (!selectedValue || !columns.length) {
+      console.warn("No collection selected or columns undefined.");
+      return;
+    }
+  
+    const allData = await fetchAllDataForExport();
+  
+    if (!allData.length) {
+      console.warn("No data to export.");
+      return;
+    }
+  
+    // 1. Encabezados
+    const header = columns.join(",");
+  
+    // 2. Filas
+    const rows = allData.map((row) =>
+      columns.map((col) => {
+        const cell = row[col];
+        const value = typeof cell === "string" ? `"${cell.replace(/"/g, '""')}"` : cell;
+        return value ?? "";
+      }).join(",")
+    );
+  
+    // 3. Contenido CSV
+    const csvContent = [header, ...rows].join("\n");
+  
+    // 4. Descarga
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const currentDate = formatDate(new Date());
+    const fileName = `data-full-${currentDate}.csv`;
+  
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute("download", fileName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+  
+  
+  
 
   // Function to format date as "DD-MM-YYYY-HH-mm-ss"
   const formatDate = (date) => {

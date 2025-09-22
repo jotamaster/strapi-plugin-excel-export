@@ -1,6 +1,39 @@
 "use strict";
 const ExcelJS = require("exceljs");
 
+// Utility to strip HTML tags and decode common HTML entities
+const stripHtml = (value) => {
+  if (value === null || value === undefined) return value;
+  let text = String(value);
+  // Convert common line-break tags to whitespace first
+  text = text.replace(/<(br|BR)\s*\/?>/g, "\n");
+  text = text.replace(/<\/(p|P)>/g, "\n");
+  // Remove all remaining tags
+  text = text.replace(/<[^>]+>/g, "");
+  // Decode common entities
+  const entitiesMap = {
+    "&nbsp;": " ",
+    "&amp;": "&",
+    "&lt;": "<",
+    "&gt;": ">",
+    "&quot;": '"',
+    "&#39;": "'",
+    "&#x27;": "'",
+  };
+  text = text.replace(/&nbsp;|&amp;|&lt;|&gt;|&quot;|&#39;|&#x27;/g, (m) => entitiesMap[m] || m);
+  // Decode numeric entities
+  text = text.replace(/&#(\d+);/g, (_, code) => {
+    try {
+      return String.fromCharCode(parseInt(code, 10));
+    } catch (_) {
+      return _;
+    }
+  });
+  // Collapse whitespace
+  text = text.replace(/\s+/g, " ").trim();
+  return text;
+};
+
 module.exports = ({ strapi }) => ({
   async getDropDownData() {
     let excel = strapi.config.get("excel");
@@ -163,13 +196,27 @@ module.exports = ({ strapi }) => ({
     return restructuredObject;
   },
   async restructureData(data, objectStructure) {
+    const stripColumns = new Set([
+      ...(objectStructure?.stripHtmlColumns || []),
+      ...((objectStructure?.export && objectStructure?.export?.stripHtmlColumns) || []),
+    ]);
+
     return data.map((item) => {
       const restructuredItem = {};
 
       // Restructure main data based on columns
       for (const key of objectStructure.columns) {
         if (key in item) {
-          restructuredItem[key] = item[key];
+          const rawValue = item[key];
+          if (stripColumns.has(key)) {
+            if (Array.isArray(rawValue)) {
+              restructuredItem[key] = rawValue.map((v) => stripHtml(v)).join(" ");
+            } else {
+              restructuredItem[key] = stripHtml(rawValue);
+            }
+          } else {
+            restructuredItem[key] = rawValue;
+          }
         }
       }
 
@@ -179,11 +226,11 @@ module.exports = ({ strapi }) => ({
           const column = objectStructure.relation[key].column[0];
           if (item[key] && typeof item[key] === "object") {
             if (Array.isArray(item[key]) && item[key].length > 0) {
-              restructuredItem[key] = item[key]
-                .map((obj) => obj[column])
-                .join(" ");
+              const joined = item[key].map((obj) => obj[column]).join(" ");
+              restructuredItem[key] = stripColumns.has(key) ? stripHtml(joined) : joined;
             } else {
-              restructuredItem[key] = item[key][column];
+              const val = item[key][column];
+              restructuredItem[key] = stripColumns.has(key) ? stripHtml(val) : val;
             }
           } else {
             // Handle the case where item[key] is not an object
